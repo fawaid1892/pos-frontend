@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/sync_provider.dart';
-import '../services/mock_api_service.dart';
+import '../providers/theme_provider.dart';
+import '../services/transaction_service.dart';
 import '../widgets/sync_status_widget.dart';
+import '../utils/responsive.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -16,7 +18,7 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _amountController = TextEditingController();
   final _discountController = TextEditingController();
-  final _api = MockApiService();
+  final _transactionService = TransactionService();
   final List<Map<String, dynamic>> _paymentMethods = const [
     {'key': 'Tunai', 'icon': Icons.money},
     {'key': 'QRIS', 'icon': Icons.qr_code},
@@ -24,6 +26,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     {'key': 'Kartu Debit', 'icon': Icons.credit_card},
   ];
   bool _isProcessing = false;
+
+  // Predefined tax rates: 0% (non-PPN), 11% (PPN standard)
+  final List<Map<String, dynamic>> _taxRates = const [
+    {'label': 'Non PPN', 'rate': 0.0},
+    {'label': 'PPN 11%', 'rate': 0.11},
+  ];
 
   @override
   void dispose() {
@@ -64,7 +72,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final auth = context.read<AuthProvider>();
 
     // Apply optional discount
-    final disc = double.tryParse(_discountController.text.replaceAll('.', '')) ?? 0;
+    final disc =
+        double.tryParse(_discountController.text.replaceAll('.', '')) ?? 0;
     if (disc > 0) {
       cart.setCartDiscount(disc);
     }
@@ -80,7 +89,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
 
     try {
-      await _api.submitTransaction(transaction);
+      // Save transaction to local SQLite
+      await _transactionService.submitTransaction(transaction);
       if (!mounted) return;
       cart.clearCart();
       Navigator.pushReplacementNamed(context, '/receipt', arguments: transaction);
@@ -98,11 +108,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
+    final theme = Theme.of(context);
+    final isTablet = context.isTablet;
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pembayaran'),
         actions: [
+          Consumer<ThemeProvider>(
+            builder: (context, themeProv, _) => IconButton(
+              icon: Icon(
+                themeProv.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+              ),
+              onPressed: () => themeProv.toggleTheme(),
+              tooltip: 'Toggle Dark Mode',
+            ),
+          ),
           IconButton(
             icon: const SyncStatusIcon(),
             onPressed: () => Navigator.pushNamed(context, '/sync-status'),
@@ -111,7 +133,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(isTablet ? 24 : 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -132,8 +154,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text('${item.productName} x${item.quantity}'),
-                              Text(
-                                  'Rp ${_formatPrice(item.subtotal)}'),
+                              Text('Rp ${_formatPrice(item.subtotal)}'),
                             ],
                           ),
                         )),
@@ -156,6 +177,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               style: const TextStyle(color: Colors.red)),
                         ],
                       ),
+                    if (cart.taxRate > 0) ...[                      
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Pajak (${(cart.taxRate * 100).toStringAsFixed(0)}%)',
+                              style: const TextStyle(fontWeight: FontWeight.w500)),
+                          Text('Rp ${_formatPrice(cart.taxAmount)}',
+                              style: TextStyle(color: colorScheme.primary)),
+                        ],
+                      ),
+                    ],
                     const Divider(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -164,12 +196,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             style: TextStyle(
                                 fontWeight: FontWeight.bold, fontSize: 18)),
                         Text('Rp ${_formatPrice(cart.grandTotal)}',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
-                                color: Colors.green)),
+                                color: colorScheme.primary)),
                       ],
                     ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Pajak (Tax Rate Selector)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Pajak (PPN)',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _taxRates.map((tax) {
+                        final isSelected = cart.taxRate == tax['rate'];
+                        return ChoiceChip(
+                          label: Text(tax['label'] as String),
+                          selected: isSelected,
+                          onSelected: (_) {
+                            cart.setTaxRate(tax['rate'] as double);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    if (cart.taxRate > 0) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                              'Pajak ${(cart.taxRate * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w500)),
+                          Text('Rp ${_formatPrice(cart.taxAmount)}',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.primary)),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -188,11 +266,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: _discountController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Diskon (Rp)',
                         prefixText: 'Rp ',
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         hintText: '0',
+                        filled: true,
+                        fillColor: colorScheme.surfaceVariant,
                       ),
                       keyboardType: TextInputType.number,
                     ),
@@ -222,8 +304,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           label: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(method['icon'] as IconData,
-                                  size: 18),
+                              Icon(method['icon'] as IconData, size: 18),
                               const SizedBox(width: 4),
                               Text(method['key'] as String),
                             ],
@@ -252,10 +333,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: _amountController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Nominal bayar',
                         prefixText: 'Rp ',
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: colorScheme.surfaceVariant,
                       ),
                       keyboardType: TextInputType.number,
                       onChanged: (_) => setState(() {}),
@@ -273,8 +358,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: _isPaymentValid
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.error,
+                                  ? colorScheme.primary
+                                  : colorScheme.error,
                             ),
                           ),
                         ],
