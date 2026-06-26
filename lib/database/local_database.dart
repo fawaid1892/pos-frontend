@@ -21,7 +21,7 @@ class LocalDatabase {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onConfigure: _onConfigure,
@@ -224,6 +224,10 @@ class LocalDatabase {
     if (oldVersion < 3) {
       // Add payment_reference column
       await db.execute('ALTER TABLE transactions ADD COLUMN payment_reference TEXT');
+    }
+    if (oldVersion < 4) {
+      // Add cost_price to products
+      await db.execute('ALTER TABLE products ADD COLUMN cost_price REAL NOT NULL DEFAULT 0');
     }
   }
 

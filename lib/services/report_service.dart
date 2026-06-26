@@ -146,6 +146,9 @@ class ReportService {
   }
 
   /// GET profit-loss report from transactions.
+  ///
+  /// COGS dihitung dari cost_price produk (real), bukan hardcoded multiplier.
+  /// Fallback ke price * 0.7 jika cost_price = 0.
   Future<ProfitLossReport> getProfitLossReport({
     required String branchId,
     required DateTime startDate,
@@ -157,18 +160,31 @@ class ReportService {
     final startStr = startDate.toIso8601String();
     final endStr = endDate.toIso8601String();
 
-    final result = await db.rawQuery('''
+    // Total revenue
+    final revenueResult = await db.rawQuery('''
       SELECT COALESCE(SUM(grand_total), 0) AS total_revenue
       FROM transactions
       WHERE branch_id = ?
         AND created_at >= ?
         AND created_at <= ?
     ''', [branchId, startStr, endStr]);
+    final totalRevenue = (revenueResult.first['total_revenue'] as num?)?.toDouble() ?? 0;
 
-    final totalRevenue = (result.first['total_revenue'] as num?)?.toDouble() ?? 0;
-    final totalCost = totalRevenue * 0.6; // Approximation: 60% COGS
+    // Actual COGS dari cost_price (fallback price * 0.7 jika cost_price = 0)
+    final costResult = await db.rawQuery('''
+      SELECT COALESCE(SUM(ti.quantity * COALESCE(NULLIF(p.cost_price, 0), p.price * 0.7)), 0) AS total_cost
+      FROM transaction_items ti
+      JOIN transactions t ON t.id = ti.transaction_id
+      JOIN products p ON p.id = ti.product_id
+      WHERE t.branch_id = ?
+        AND t.created_at >= ?
+        AND t.created_at <= ?
+    ''', [branchId, startStr, endStr]);
+    final totalCost = (costResult.first['total_cost'] as num?)?.toDouble() ?? 0;
+
     final grossProfit = totalRevenue - totalCost;
-    final totalExpenses = totalRevenue * 0.2; // Approximation: 20% operating expenses
+    // Biaya operasional: tidak ada data real, dikosongkan dulu
+    final totalExpenses = 0.0;
     final netProfit = grossProfit - totalExpenses;
 
     return ProfitLossReport(
