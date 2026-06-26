@@ -1,0 +1,7 @@
+targets:
+  $default:
+    builders:
+      mockito|mockBuilder:
+        enabled: true
+        generate_for:
+          - test/**/*_test.dart
