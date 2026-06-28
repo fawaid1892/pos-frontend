@@ -14,6 +14,7 @@ import '../widgets/sync_status_widget.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/error_state_widget.dart';
 import '../widgets/empty_state_widget.dart';
+import '../widgets/barcode_scanner_widget.dart';
 import '../utils/responsive.dart';
 
 class PosScreen extends StatefulWidget {
@@ -100,11 +101,57 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _scanBarcode() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Barcode scanner akan aktif di perangkat Android'),
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => BarcodeScannerWidget(
+          onDetected: (barcode) {
+            // Pop the scanner immediately when barcode is detected
+            Navigator.of(context).pop(barcode);
+          },
+        ),
       ),
     );
+
+    if (result == null || !mounted) return;
+
+    final barcode = result.trim();
+    if (barcode.isEmpty) return;
+
+    final auth = context.read<AuthProvider>();
+    final branchId = auth.branchId ?? 'branch_001';
+
+    try {
+      final product = await _productService.getProductByBarcode(barcode, branchId);
+      if (!mounted) return;
+
+      if (product != null) {
+        _addToCart(product);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Produk ditemukan: ${product.name}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(milliseconds: 1200),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Produk dengan barcode "$barcode" tidak ditemukan'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal mencari produk: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
@@ -203,6 +250,11 @@ class _PosScreenState extends State<PosScreen> {
         ],
       ),
       body: _showCart ? _buildCartView(cart) : _buildProductView(cart, isTablet),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _scanBarcode,
+        tooltip: 'Scan Barcode',
+        child: const Icon(Icons.qr_code_scanner),
+      ),
     );
   }
 
