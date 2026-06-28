@@ -135,6 +135,12 @@ class _PosScreenState extends State<PosScreen> {
               onPressed: () => Navigator.pushNamed(context, '/users'),
               tooltip: 'Manajemen User',
             ),
+          // Receipt settings
+          IconButton(
+            icon: const Icon(Icons.receipt_long_outlined),
+            onPressed: () => Navigator.pushNamed(context, '/receipt-settings'),
+            tooltip: 'Pengaturan Struk',
+          ),
           // Sync status icon button
           IconButton(
             icon: const SyncStatusIcon(),

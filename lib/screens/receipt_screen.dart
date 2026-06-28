@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_bluetooth_basic/flutter_bluetooth_basic.dart';
 import '../models/transaction.dart';
 import '../providers/theme_provider.dart';
+import '../providers/receipt_settings_provider.dart';
 import '../services/thermal_print_service.dart';
 import '../utils/responsive.dart';
 
@@ -143,9 +144,9 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     final success = await _printService.printReceiptBluetooth(
       device: device,
       transaction: transaction,
-      storeName: 'TOKO KAMI',
-      storeAddress: 'POS Multi Branch',
-      storePhone: '021-12345678',
+      storeName: context.read<ReceiptSettingsProvider>().settings.storeName,
+      storeAddress: context.read<ReceiptSettingsProvider>().settings.storeAddress,
+      storePhone: context.read<ReceiptSettingsProvider>().settings.storePhone,
     );
 
     if (!mounted) return;
@@ -165,9 +166,9 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
 
     final success = await _printService.printReceiptUsb(
       transaction: transaction,
-      storeName: 'TOKO KAMI',
-      storeAddress: 'POS Multi Branch',
-      storePhone: '021-12345678',
+      storeName: context.read<ReceiptSettingsProvider>().settings.storeName,
+      storeAddress: context.read<ReceiptSettingsProvider>().settings.storeAddress,
+      storePhone: context.read<ReceiptSettingsProvider>().settings.storePhone,
     );
 
     if (!mounted) return;
@@ -206,6 +207,11 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
               onPressed: () => themeProv.toggleTheme(),
               tooltip: 'Toggle Dark Mode',
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.pushNamed(context, '/receipt-settings'),
+            tooltip: 'Pengaturan Struk',
           ),
           Stack(
             children: [
@@ -258,14 +264,16 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                   children: [
                     // Header
                     Text(
-                      'TOKO KAMI',
+                      context.watch<ReceiptSettingsProvider>().settings.storeName,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: colorScheme.primary,
                       ),
                     ),
-                    Text('POS Multi Branch',
+                    Text(context.watch<ReceiptSettingsProvider>().settings.storeAddress.isNotEmpty
+                              ? context.watch<ReceiptSettingsProvider>().settings.storeAddress
+                              : 'POS Multi Branch',
                         style: TextStyle(color: colorScheme.onSurfaceVariant)),
                     const Divider(),
 

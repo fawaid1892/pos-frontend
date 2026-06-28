@@ -7,6 +7,7 @@ import 'providers/report_provider.dart';
 import 'providers/sync_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/user_provider.dart';
+import 'providers/receipt_settings_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/pos_screen.dart';
 import 'screens/checkout_screen.dart';
@@ -19,6 +20,7 @@ import 'screens/export_screen.dart';
 import 'screens/low_stock_alert_screen.dart';
 import 'screens/user_list_screen.dart';
 import 'screens/user_form_screen.dart';
+import 'screens/receipt_settings_screen.dart';
 import 'widgets/sync_status_widget.dart';
 import 'models/stock_adjustment.dart';
 import 'database/local_database.dart';
@@ -42,6 +44,10 @@ void main() async {
   final syncProvider = SyncProvider();
   await syncProvider.init();
 
+  // Initialize receipt settings
+  final receiptSettingsProvider = ReceiptSettingsProvider();
+  await receiptSettingsProvider.init();
+
   runApp(
     MultiProvider(
       providers: [
@@ -51,6 +57,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => StockProvider()),
         ChangeNotifierProvider(create: (_) => ReportProvider()),
         ChangeNotifierProvider.value(value: syncProvider),
+        ChangeNotifierProvider.value(value: receiptSettingsProvider),
         ChangeNotifierProvider(create: (_) => UserProvider()),
       ],
       child: const PosApp(),
@@ -98,6 +105,7 @@ class PosApp extends StatelessWidget {
         '/low-stock-alert': (context) => const LowStockAlertScreen(),
         '/users': (context) => const UserListScreen(),
         '/user-form': (context) => const UserFormScreen(),
+        '/receipt-settings': (context) => const ReceiptSettingsScreen(),
       },
     );
   }
