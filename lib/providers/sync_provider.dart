@@ -1,98 +1,51 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../services/sync_service.dart';
-import '../services/connectivity_service.dart';
+import 'electric_service.dart';
 
-/// Provider that syncs SyncService + ConnectivityService state for UI.
+/// Provider that syncs ElectricService state for UI.
+///
+/// Electric handles sync automatically via shape subscriptions.
+/// This provider simply exposes the connection state to the UI.
 class SyncProvider extends ChangeNotifier {
-  final SyncService _syncService = SyncService();
-  final ConnectivityService _connectivityService = ConnectivityService();
+  final ElectricService _electricService = ElectricService();
 
-  bool _isSyncing = false;
-  bool _isOnline = true;
-  int _pendingCount = 0;
-  int _conflictCount = 0;
-  SyncResult? _lastSyncResult;
-  StreamSubscription? _syncSubscription;
+  ElectricConnectionState _connectionState = ElectricConnectionState.disconnected;
+  String? _lastError;
+  int _shapeCount = 0;
 
-  SyncService get syncService => _syncService;
-  ConnectivityService get connectivityService => _connectivityService;
-  bool get isSyncing => _isSyncing;
-  bool get isOnline => _isOnline;
-  int get pendingCount => _pendingCount;
-  int get conflictCount => _conflictCount;
-  SyncResult? get lastSyncResult => _lastSyncResult;
+  ElectricService get electricService => _electricService;
+  ElectricConnectionState get connectionState => _connectionState;
+  String? get lastError => _lastError;
+  bool get isConnected => _connectionState == ElectricConnectionState.connected;
+  bool get isSyncing => _connectionState == ElectricConnectionState.connecting;
+  int get shapeCount => _shapeCount;
 
   /// Initialize the provider.
   Future<void> init() async {
-    // Listen to SyncService changes
-    _syncService.addListener(_onSyncServiceChanged);
+    // Listen to ElectricService changes
+    _electricService.addListener(_onElectricServiceChanged);
 
-    // Start connectivity monitoring
-    _connectivityService.startMonitoring(
-      onReconnectedCallback: _onReconnected,
-    );
-
-    // Initialize the sync service
-    await _syncService.init();
+    // Initialize the Electric service
+    await _electricService.init();
 
     // Sync initial state
-    _isOnline = _connectivityService.isOnline;
-    _pendingCount = _syncService.pendingCount;
-    _conflictCount = _syncService.conflictCount;
+    _connectionState = _electricService.connectionState;
+    _lastError = _electricService.lastError;
+    _shapeCount = ElectricService.shapes.length;
 
     notifyListeners();
   }
 
-  void _onSyncServiceChanged() {
-    _isSyncing = _syncService.status == SyncStatus.syncing;
-    _pendingCount = _syncService.pendingCount;
-    _conflictCount = _syncService.conflictCount;
-    _lastSyncResult = _syncService.lastSyncResult;
-    notifyListeners();
-  }
-
-  void _onReconnected() {
-    _isOnline = true;
-    notifyListeners();
-
-    // Auto-trigger sync when connection is restored
-    triggerSync();
-  }
-
-  /// Trigger a full sync cycle.
-  Future<SyncResult> triggerSync() async {
-    _isSyncing = true;
-    notifyListeners();
-
-    final result = await _syncService.syncAll();
-
-    _isSyncing = _syncService.status == SyncStatus.syncing;
-    _pendingCount = _syncService.pendingCount;
-    _conflictCount = _syncService.conflictCount;
-    _lastSyncResult = result;
-    notifyListeners();
-
-    return result;
-  }
-
-  /// Check connectivity manually.
-  Future<void> checkConnectivity() async {
-    _isOnline = await _connectivityService.checkConnectivity();
-    notifyListeners();
-  }
-
-  /// Refresh pending counts from the sync service.
-  Future<void> refreshCounts() async {
-    _pendingCount = _syncService.pendingCount;
-    _conflictCount = _syncService.conflictCount;
+  void _onElectricServiceChanged() {
+    _connectionState = _electricService.connectionState;
+    _lastError = _electricService.lastError;
     notifyListeners();
   }
 
   @override
   void dispose() {
-    _syncService.removeListener(_onSyncServiceChanged);
-    _connectivityService.dispose();
+    _electricService.removeListener(_onElectricServiceChanged);
+    _electricService.dispose();
     super.dispose();
   }
 }

@@ -1,31 +1,27 @@
 import '../database/local_database.dart';
-import '../database/daos/stock_mutation_dao.dart';
 import '../models/branch.dart';
 import '../models/stock_adjustment.dart';
 
-/// Service for stock operations backed by SQLite.
+/// Service for stock operations backed by ElectricSQL/PGlite.
 ///
 /// Replaces MockStockService for stock inventory, adjustments, and transfers.
+/// Now uses LocalDatabase which wraps Electric HTTP API instead of sqflite.
 class StockService {
   static final StockService _instance = StockService._internal();
   factory StockService() => _instance;
   StockService._internal();
 
   final LocalDatabase _db = LocalDatabase();
-  final StockMutationDao _mutationDao = StockMutationDao();
 
   /// Get all branches from local DB.
   Future<List<Branch>> getBranches() async {
-    final db = await _db.database;
-    final maps = await db.query('branches', orderBy: 'name ASC');
+    final maps = await _db.query('branches', orderBy: 'name ASC');
     return maps.map((m) => Branch.fromJson(m)).toList();
   }
 
   /// Get inventory for a branch (from branch_products + products).
   Future<List<ProductStock>> getInventory(String branchId) async {
-    final db = await _db.database;
-
-    final maps = await db.rawQuery('''
+    final maps = await _db.rawQuery('''
       SELECT
         bp.product_id,
         p.name AS product_name,
@@ -57,18 +53,16 @@ class StockService {
     required String reason,
     required String type,
   }) async {
-    final db = await _db.database;
     final adjustedQty = type == 'in' ? quantity : -quantity;
 
     // 1. Update branch_products stock count
-    await db.rawUpdate('''
-      UPDATE branch_products
-      SET stock = stock + ?, pending_sync = 1, sync_status = 'pending'
-      WHERE branch_id = ? AND product_id = ?
-    ''', [adjustedQty, branchId, productId]);
+    await _db.execute(
+      'UPDATE branch_products SET stock = stock + ? WHERE branch_id = ? AND product_id = ?',
+      [adjustedQty, branchId, productId],
+    );
 
     // 2. Get product name
-    final productRows = await db.query('products',
+    final productRows = await _db.query('products',
       where: 'id = ?', whereArgs: [productId]);
     final productName = productRows.isNotEmpty
         ? (productRows.first['name'] as String)
@@ -86,7 +80,7 @@ class StockService {
       createdAt: DateTime.now(),
     );
 
-    await _mutationDao.insert(mutation.toJson());
+    await _db.insert('stock_mutations', mutation.toJson());
 
     return mutation;
   }
@@ -98,42 +92,35 @@ class StockService {
     required String productId,
     required int quantity,
   }) async {
-    final db = await _db.database;
-
     // 1. Deduct from source
-    await db.rawUpdate('''
-      UPDATE branch_products
-      SET stock = stock - ?, pending_sync = 1, sync_status = 'pending'
-      WHERE branch_id = ? AND product_id = ?
-    ''', [quantity, sourceBranchId, productId]);
+    await _db.execute(
+      'UPDATE branch_products SET stock = stock - ? WHERE branch_id = ? AND product_id = ?',
+      [quantity, sourceBranchId, productId],
+    );
 
     // 2. Add to target (insert if not exists)
-    final existingTarget = await db.query('branch_products',
+    final existingTarget = await _db.query('branch_products',
       where: 'branch_id = ? AND product_id = ?',
       whereArgs: [targetBranchId, productId]);
 
     if (existingTarget.isNotEmpty) {
-      await db.rawUpdate('''
-        UPDATE branch_products
-        SET stock = stock + ?, pending_sync = 1, sync_status = 'pending'
-        WHERE branch_id = ? AND product_id = ?
-      ''', [quantity, targetBranchId, productId]);
+      await _db.execute(
+        'UPDATE branch_products SET stock = stock + ? WHERE branch_id = ? AND product_id = ?',
+        [quantity, targetBranchId, productId],
+      );
     } else {
-      // Create new branch_product entry for target
       final id = '${targetBranchId}_$productId';
-      await db.insert('branch_products', {
+      await _db.insert('branch_products', {
         'id': id,
         'branch_id': targetBranchId,
         'product_id': productId,
         'stock': quantity,
         'minimum_stock': 5,
-        'pending_sync': 1,
-        'sync_status': 'pending',
       });
     }
 
     // 3. Get names
-    final productRows = await db.query('products',
+    final productRows = await _db.query('products',
       where: 'id = ?', whereArgs: [productId]);
     final productName = productRows.isNotEmpty
         ? (productRows.first['name'] as String)
@@ -147,7 +134,7 @@ class StockService {
       {'branch_id': sourceBranchId, 'type': 'transfer_out'},
       {'branch_id': targetBranchId, 'type': 'transfer_in'},
     ]) {
-      await _mutationDao.insert({
+      await _db.insert('stock_mutations', {
         'id': 'mut_${DateTime.now().millisecondsSinceEpoch}_${entry['type']}',
         'branch_id': entry['branch_id'],
         'product_id': productId,
@@ -156,8 +143,6 @@ class StockService {
         'reason': 'Transfer antar cabang',
         'type': entry['type'],
         'created_at': DateTime.now().toIso8601String(),
-        'pending_sync': 1,
-        'sync_status': 'pending',
       });
     }
 
@@ -178,9 +163,7 @@ class StockService {
   /// Get stock alerts (stock <= minimum_stock).
   Future<List<ProductStock>> getStockAlerts(String branchId,
       {int minimumStock = 5}) async {
-    final db = await _db.database;
-
-    final maps = await db.rawQuery('''
+    final maps = await _db.rawQuery('''
       SELECT
         bp.product_id,
         p.name AS product_name,
@@ -207,10 +190,9 @@ class StockService {
   /// Search inventory locally.
   Future<List<ProductStock>> searchInventory(
       String branchId, String query) async {
-    final db = await _db.database;
     final q = '%$query%';
 
-    final maps = await db.rawQuery('''
+    final maps = await _db.rawQuery('''
       SELECT
         bp.product_id,
         p.name AS product_name,
@@ -236,8 +218,7 @@ class StockService {
   }
 
   Future<String> _getBranchName(String branchId) async {
-    final db = await _db.database;
-    final rows = await db.query('branches',
+    final rows = await _db.query('branches',
       where: 'id = ?', whereArgs: [branchId]);
     if (rows.isEmpty) return 'Unknown';
     return rows.first['name'] as String;

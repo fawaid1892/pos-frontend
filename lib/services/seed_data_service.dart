@@ -1,9 +1,9 @@
-import 'package:sqflite/sqflite.dart';
 import '../database/local_database.dart';
 
-/// Seeds initial data into local SQLite on first run.
+/// Seeds initial data into local database on first run.
 ///
-/// Called once in main.dart after database initialization.
+/// Called once in main.dart after Electric sync initialization.
+/// Uses Electric HTTP API via LocalDatabase for seeding.
 class SeedDataService {
   static final SeedDataService _instance = SeedDataService._internal();
   factory SeedDataService() => _instance;
@@ -13,51 +13,40 @@ class SeedDataService {
 
   /// Seed all initial data if the database is empty.
   Future<void> seedIfEmpty() async {
-    final db = await _db.database;
-
     // Check if data already exists
-    final count = Sqflite.firstIntValue(
-      await db.rawQuery('SELECT COUNT(*) FROM branches'),
-    );
-    if (count != null && count > 0) return;
+    final branches = await _db.query('branches');
+    if (branches.isNotEmpty) return;
 
     // ── Branches ──
-    await db.insert('branches', {
+    await _db.insert('branches', {
       'id': 'branch_001', 'name': 'Cabang Utama',
       'address': 'Jl. Merdeka No.1', 'phone': '021-1234567',
-      'pending_sync': 0, 'sync_status': 'synced',
     });
-    await db.insert('branches', {
+    await _db.insert('branches', {
       'id': 'branch_002', 'name': 'Cabang Kedua',
       'address': 'Jl. Sudirman No.45', 'phone': '021-7654321',
-      'pending_sync': 0, 'sync_status': 'synced',
     });
-    await db.insert('branches', {
+    await _db.insert('branches', {
       'id': 'branch_003', 'name': 'Cabang Ketiga',
       'address': 'Jl. Gatot Subroto No.88', 'phone': '021-5551234',
-      'pending_sync': 0, 'sync_status': 'synced',
     });
 
     // ── Users ──
-    await db.insert('users', {
+    await _db.insert('users', {
       'id': 'user_001', 'email': 'owner@example.com',
       'name': 'Owner', 'role': 'owner',
-      'pending_sync': 0, 'sync_status': 'synced',
     });
-    await db.insert('users', {
+    await _db.insert('users', {
       'id': 'user_002', 'email': 'kasir@example.com',
       'name': 'Kasir', 'role': 'cashier', 'branch_id': 'branch_001',
-      'pending_sync': 0, 'sync_status': 'synced',
     });
 
     // ── Categories ──
-    await db.insert('categories', {
+    await _db.insert('categories', {
       'id': 'cat_001', 'name': 'Minuman',
-      'pending_sync': 0, 'sync_status': 'synced',
     });
-    await db.insert('categories', {
+    await _db.insert('categories', {
       'id': 'cat_002', 'name': 'Makanan',
-      'pending_sync': 0, 'sync_status': 'synced',
     });
 
     // ── Products ──
@@ -73,10 +62,7 @@ class SeedDataService {
     ];
 
     for (final p in products) {
-      await db.insert('products', {
-        ...p,
-        'pending_sync': 0, 'sync_status': 'synced',
-      });
+      await _db.insert('products', {...p});
     }
 
     // ── Branch Products (inventory per branch) ──
@@ -88,13 +74,12 @@ class SeedDataService {
 
     for (final branchEntry in branchStocks.entries) {
       for (final stockEntry in branchEntry.value.entries) {
-        await db.insert('branch_products', {
+        await _db.insert('branch_products', {
           'id': '${branchEntry.key}_${stockEntry.key}',
           'branch_id': branchEntry.key,
           'product_id': stockEntry.key,
           'stock': stockEntry.value,
           'minimum_stock': 5,
-          'pending_sync': 0, 'sync_status': 'synced',
         });
       }
     }

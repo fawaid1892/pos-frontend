@@ -15,7 +15,18 @@ class ApiConfig {
   /// Timeout duration for HTTP requests.
   static const Duration requestTimeout = Duration(seconds: 30);
 
-  /// ── Sync Endpoints ──
+  /// ── ElectricSQL Sync Endpoints ──
+
+  /// Electric sync service base URL (runs on Docker, port 5133).
+  static const String electricBaseUrl = 'http://localhost:5133';
+
+  /// Shape URL for a given table name.
+  static String shapeUrl(String table) => '$electricBaseUrl/v1/shape/$table';
+
+  /// Query endpoint for executing SQL via Electric HTTP API.
+  static String get queryUrl => '$electricBaseUrl/v1/query';
+
+  /// ── Sync Endpoints (Legacy — kept for reference) ──
 
   static String get syncPushUrl => '$baseUrl$apiPrefix/sync/push';
   static String get syncPullUrl => '$baseUrl$apiPrefix/sync/pull';

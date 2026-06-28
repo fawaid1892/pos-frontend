@@ -2,9 +2,9 @@ import '../database/local_database.dart';
 import '../models/report.dart';
 import 'pdf_export_service.dart';
 
-/// Service for report queries backed by SQLite.
+/// Service for report queries backed by ElectricSQL/PGlite.
 ///
-/// Replaces MockReportService with actual database queries.
+/// Replaces MockReportService with actual database queries via Electric HTTP API.
 class ReportService {
   static final ReportService _instance = ReportService._internal();
   factory ReportService() => _instance;
@@ -14,8 +14,7 @@ class ReportService {
 
   /// Get branch name by ID.
   Future<String> _getBranchName(String branchId) async {
-    final db = await _db.database;
-    final rows = await db.query('branches',
+    final rows = await _db.query('branches',
       where: 'id = ?', whereArgs: [branchId]);
     if (rows.isEmpty) return 'Cabang Lain';
     return rows.first['name'] as String;
@@ -27,14 +26,13 @@ class ReportService {
     required DateTime startDate,
     required DateTime endDate,
   }) async {
-    final db = await _db.database;
     final branchName = await _getBranchName(branchId);
 
     final startStr = startDate.toIso8601String();
     final endStr = endDate.toIso8601String();
 
     // Get transactions in date range
-    final transactions = await db.rawQuery('''
+    final transactions = await _db.rawQuery('''
       SELECT * FROM transactions
       WHERE branch_id = ?
         AND created_at >= ?
@@ -50,7 +48,7 @@ class ReportService {
       totalSales += (t['grand_total'] as num?)?.toDouble() ?? 0;
 
       // Get items for this transaction
-      final items = await db.rawQuery('''
+      final items = await _db.rawQuery('''
         SELECT * FROM transaction_items
         WHERE transaction_id = ?
       ''', [t['id']]);
@@ -99,10 +97,9 @@ class ReportService {
 
   /// GET stock report from branch_products + products.
   Future<StockReport> getStockReport(String branchId) async {
-    final db = await _db.database;
     final branchName = await _getBranchName(branchId);
 
-    final maps = await db.rawQuery('''
+    final maps = await _db.rawQuery('''
       SELECT
         bp.product_id,
         p.name AS product_name,
@@ -151,13 +148,12 @@ class ReportService {
     required DateTime startDate,
     required DateTime endDate,
   }) async {
-    final db = await _db.database;
     final branchName = await _getBranchName(branchId);
 
     final startStr = startDate.toIso8601String();
     final endStr = endDate.toIso8601String();
 
-    final result = await db.rawQuery('''
+    final result = await _db.rawQuery('''
       SELECT COALESCE(SUM(grand_total), 0) AS total_revenue
       FROM transactions
       WHERE branch_id = ?

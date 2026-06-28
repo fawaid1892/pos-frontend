@@ -1,7 +1,7 @@
 import '../database/local_database.dart';
 import '../models/product.dart';
 
-/// Service for product CRUD operations backed by SQLite.
+/// Service for product CRUD operations backed by ElectricSQL/PGlite.
 ///
 /// Replaces MockApiService for product-related operations.
 class ProductService {
@@ -14,9 +14,7 @@ class ProductService {
   /// Get all products for a specific branch.
   /// Joins products + branch_products to get stock per branch.
   Future<List<Product>> getProducts(String branchId) async {
-    final db = await _db.database;
-
-    final maps = await db.rawQuery('''
+    final maps = await _db.rawQuery('''
       SELECT p.*, bp.stock
       FROM products p
       INNER JOIN branch_products bp ON bp.product_id = p.id
@@ -33,9 +31,7 @@ class ProductService {
 
   /// Get a product by barcode.
   Future<Product?> getProductByBarcode(String barcode, String branchId) async {
-    final db = await _db.database;
-
-    final maps = await db.rawQuery('''
+    final maps = await _db.rawQuery('''
       SELECT p.*, bp.stock
       FROM products p
       INNER JOIN branch_products bp ON bp.product_id = p.id
@@ -53,10 +49,9 @@ class ProductService {
 
   /// Search products by name or barcode.
   Future<List<Product>> searchProducts(String query, String branchId) async {
-    final db = await _db.database;
     final q = '%$query%';
 
-    final maps = await db.rawQuery('''
+    final maps = await _db.rawQuery('''
       SELECT p.*, bp.stock
       FROM products p
       INNER JOIN branch_products bp ON bp.product_id = p.id
@@ -74,17 +69,7 @@ class ProductService {
 
   /// Insert or update a product (upsert).
   Future<void> upsertProduct(Product product) async {
-    final db = await _db.database;
-
-    await db.insert(
-      'products',
-      {
-        ...product.toJson(),
-        'pending_sync': 1,
-        'sync_status': 'pending',
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await _db.upsert('products', product.toJson());
   }
 
   /// Upsert a branch_product record (inventory per branch).
@@ -94,21 +79,14 @@ class ProductService {
     required int stock,
     int minimumStock = 5,
   }) async {
-    final db = await _db.database;
     final id = '${branchId}_$productId';
 
-    await db.insert(
-      'branch_products',
-      {
-        'id': id,
-        'branch_id': branchId,
-        'product_id': productId,
-        'stock': stock,
-        'minimum_stock': minimumStock,
-        'pending_sync': 1,
-        'sync_status': 'pending',
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await _db.upsert('branch_products', {
+      'id': id,
+      'branch_id': branchId,
+      'product_id': productId,
+      'stock': stock,
+      'minimum_stock': minimumStock,
+    });
   }
 }

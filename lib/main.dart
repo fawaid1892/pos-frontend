@@ -18,24 +18,27 @@ import 'screens/export_screen.dart';
 import 'screens/low_stock_alert_screen.dart';
 import 'widgets/sync_status_widget.dart';
 import 'models/stock_adjustment.dart';
-import 'database/local_database.dart';
+import 'services/electric_service.dart';
 import 'services/seed_data_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize local database
-  await LocalDatabase().database;
+  // Initialize Electric sync service (replaces sqflite + manual sync)
+  final electricService = ElectricService();
+  await electricService.init();
 
-  // Seed initial data if database is empty
-  final seedService = SeedDataService();
-  await seedService.seedIfEmpty();
+  // Seed initial data if database is empty (dev only)
+  if (electricService.isConnected) {
+    final seedService = SeedDataService();
+    await seedService.seedIfEmpty();
+  }
 
   // Initialize theme provider
   final themeProvider = ThemeProvider();
   await themeProvider.init();
 
-  // Initialize sync provider
+  // Initialize sync provider (wraps ElectricService for UI state)
   final syncProvider = SyncProvider();
   await syncProvider.init();
 
