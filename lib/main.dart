@@ -6,6 +6,7 @@ import 'providers/stock_provider.dart';
 import 'providers/report_provider.dart';
 import 'providers/sync_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/user_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/pos_screen.dart';
 import 'screens/checkout_screen.dart';
@@ -16,6 +17,8 @@ import 'screens/stock_transfer_screen.dart';
 import 'screens/report_screen.dart';
 import 'screens/export_screen.dart';
 import 'screens/low_stock_alert_screen.dart';
+import 'screens/user_list_screen.dart';
+import 'screens/user_form_screen.dart';
 import 'widgets/sync_status_widget.dart';
 import 'models/stock_adjustment.dart';
 import 'database/local_database.dart';
@@ -48,6 +51,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => StockProvider()),
         ChangeNotifierProvider(create: (_) => ReportProvider()),
         ChangeNotifierProvider.value(value: syncProvider),
+        ChangeNotifierProvider(create: (_) => UserProvider()),
       ],
       child: const PosApp(),
     ),
@@ -92,6 +96,8 @@ class PosApp extends StatelessWidget {
         '/export-report': (context) => const ExportScreen(),
         '/sync-status': (context) => const SyncStatusScreen(),
         '/low-stock-alert': (context) => const LowStockAlertScreen(),
+        '/users': (context) => const UserListScreen(),
+        '/user-form': (context) => const UserFormScreen(),
       },
     );
   }

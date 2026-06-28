@@ -128,6 +128,13 @@ class _PosScreenState extends State<PosScreen> {
               tooltip: 'Toggle Dark Mode',
             ),
           ),
+          // User management (owner only)
+          if (auth.role == 'owner')
+            IconButton(
+              icon: const Icon(Icons.people_outline),
+              onPressed: () => Navigator.pushNamed(context, '/users'),
+              tooltip: 'Manajemen User',
+            ),
           // Sync status icon button
           IconButton(
             icon: const SyncStatusIcon(),
