@@ -24,7 +24,7 @@ import 'services/seed_data_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Electric sync service (replaces sqflite + manual sync)
+  // Initialize Electric sync service
   final electricService = ElectricService();
   await electricService.init();
 

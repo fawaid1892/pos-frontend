@@ -5,7 +5,7 @@ import '../models/stock_adjustment.dart';
 /// Service for stock operations backed by ElectricSQL/PGlite.
 ///
 /// Replaces MockStockService for stock inventory, adjustments, and transfers.
-/// Now uses LocalDatabase which wraps Electric HTTP API instead of sqflite.
+/// Backed by Electric HTTP API via LocalDatabase.
 class StockService {
   static final StockService _instance = StockService._internal();
   factory StockService() => _instance;

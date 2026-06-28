@@ -4,8 +4,8 @@ import 'package:http/http.dart' as http;
 
 /// Local database abstraction backed by ElectricSQL HTTP API.
 ///
-/// Instead of sqflite, this uses Electric's sync service at port 5133
-/// to execute SQL queries directly via HTTP POST /v1/query.
+/// Uses Electric's sync service at port 5133 to execute SQL queries
+/// directly via HTTP POST /v1/query.
 ///
 /// Schema is managed by Electric via Postgres logical replication —
 /// no manual onCreate/onUpgrade migrations needed.
