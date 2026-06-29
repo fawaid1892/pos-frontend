@@ -15,6 +15,7 @@ import '../widgets/shimmer_loading.dart';
 import '../widgets/error_state_widget.dart';
 import '../widgets/empty_state_widget.dart';
 import '../utils/responsive.dart';
+import 'barcode_scanner_screen.dart';
 
 class PosScreen extends StatefulWidget {
   const PosScreen({super.key});
@@ -100,11 +101,52 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _scanBarcode() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Barcode scanner akan aktif di perangkat Android'),
+    if (_products.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tidak ada produk untuk dipindai. Muat ulang produk terlebih dahulu.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    final result = await Navigator.push<BarcodeScanResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BarcodeScannerScreen(products: _products),
       ),
     );
+
+    if (result == null || !mounted) return;
+
+    if (result.product != null) {
+      // Product found — add to cart directly
+      _addToCart(result.product!);
+
+      // Set search text to scanned barcode for visual feedback
+      _searchController.text = result.barcode;
+
+      // Clear search after a short delay
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) _searchController.clear();
+      });
+    } else {
+      // Product not found — set search text so user can see the barcode
+      _searchController.text = result.barcode;
+      _searchController.selection = TextSelection.fromPosition(
+        TextPosition(offset: result.barcode.length),
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Produk dengan barcode "${result.barcode}" tidak ditemukan'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   @override
