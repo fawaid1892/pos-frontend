@@ -109,7 +109,7 @@ class ElectricService extends ChangeNotifier {
     try {
       final uri = Uri.parse('$_baseUrl/v1/shape/$shapeName');
       final response = await _httpClient
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: {'Accept': 'application/json', 'Authorization': ''})
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -150,7 +150,7 @@ class ElectricService extends ChangeNotifier {
     try {
       final uri = Uri.parse('$_baseUrl/v1/shape/$shapeName');
       final response = await _httpClient
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: {'Accept': 'application/json', 'Authorization': ''})
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
