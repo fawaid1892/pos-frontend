@@ -14,8 +14,8 @@ import '../widgets/sync_status_widget.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/error_state_widget.dart';
 import '../widgets/empty_state_widget.dart';
+import '../widgets/barcode_scanner_widget.dart';
 import '../utils/responsive.dart';
-import 'barcode_scanner_screen.dart';
 
 class PosScreen extends StatefulWidget {
   const PosScreen({super.key});
@@ -101,49 +101,54 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _scanBarcode() async {
-    if (_products.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tidak ada produk untuk dipindai. Muat ulang produk terlebih dahulu.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    if (!mounted) return;
-    final result = await Navigator.push<BarcodeScanResult>(
-      context,
+    final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
-        builder: (_) => BarcodeScannerScreen(products: _products),
+        builder: (_) => BarcodeScannerWidget(
+          onDetected: (barcode) {
+            // Pop the scanner immediately when barcode is detected
+            Navigator.of(context).pop(barcode);
+          },
+        ),
       ),
     );
 
     if (result == null || !mounted) return;
 
-    if (result.product != null) {
-      // Product found — add to cart directly
-      _addToCart(result.product!);
+    final barcode = result.trim();
+    if (barcode.isEmpty) return;
 
-      // Set search text to scanned barcode for visual feedback
-      _searchController.text = result.barcode;
+    final auth = context.read<AuthProvider>();
+    final branchId = auth.branchId ?? 'branch_001';
 
-      // Clear search after a short delay
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) _searchController.clear();
-      });
-    } else {
-      // Product not found — set search text so user can see the barcode
-      _searchController.text = result.barcode;
-      _searchController.selection = TextSelection.fromPosition(
-        TextPosition(offset: result.barcode.length),
-      );
+    try {
+      final product = await _productService.getProductByBarcode(barcode, branchId);
+      if (!mounted) return;
 
+      if (product != null) {
+        _addToCart(product);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Produk ditemukan: ${product.name}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(milliseconds: 1200),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Produk dengan barcode "$barcode" tidak ditemukan'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Produk dengan barcode "${result.barcode}" tidak ditemukan'),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 3),
+          content: Text('Gagal mencari produk: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -169,19 +174,6 @@ class _PosScreenState extends State<PosScreen> {
               onPressed: () => themeProv.toggleTheme(),
               tooltip: 'Toggle Dark Mode',
             ),
-          ),
-          // User management (owner only)
-          if (auth.role == 'owner')
-            IconButton(
-              icon: const Icon(Icons.people_outline),
-              onPressed: () => Navigator.pushNamed(context, '/users'),
-              tooltip: 'Manajemen User',
-            ),
-          // Receipt settings
-          IconButton(
-            icon: const Icon(Icons.receipt_long_outlined),
-            onPressed: () => Navigator.pushNamed(context, '/receipt-settings'),
-            tooltip: 'Pengaturan Struk',
           ),
           // Sync status icon button
           IconButton(
@@ -258,6 +250,11 @@ class _PosScreenState extends State<PosScreen> {
         ],
       ),
       body: _showCart ? _buildCartView(cart) : _buildProductView(cart, isTablet),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _scanBarcode,
+        tooltip: 'Scan Barcode',
+        child: const Icon(Icons.qr_code_scanner),
+      ),
     );
   }
 

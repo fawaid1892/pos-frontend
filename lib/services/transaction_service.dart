@@ -1,7 +1,7 @@
 import '../database/local_database.dart';
 import '../models/transaction.dart';
 
-/// Service for transaction CRUD operations backed by SQLite.
+/// Service for transaction CRUD operations backed by ElectricSQL/PGlite.
 ///
 /// Replaces MockApiService for transaction operations.
 class TransactionService {
@@ -11,12 +11,10 @@ class TransactionService {
 
   final LocalDatabase _db = LocalDatabase();
 
-  /// Submit a new transaction (saves to local DB with pending sync).
+  /// Submit a new transaction (saves to local DB via Electric HTTP API).
   Future<Transaction> submitTransaction(Transaction transaction) async {
-    final db = await _db.database;
-
     // 1. Insert transaction record
-    await db.insert('transactions', {
+    await _db.insert('transactions', {
       'id': transaction.id,
       'branch_id': transaction.branchId,
       'cashier_id': transaction.cashierId,
@@ -32,14 +30,12 @@ class TransactionService {
       'change_amount': transaction.change,
       'receipt_number': transaction.receiptNumber,
       'created_at': transaction.createdAt.toIso8601String(),
-      'pending_sync': 1,
-      'sync_status': 'pending',
     });
 
     // 2. Insert transaction items
     for (final item in transaction.items) {
       final itemId = '${transaction.id}_${item.productId}';
-      await db.insert('transaction_items', {
+      await _db.insert('transaction_items', {
         'id': itemId,
         'transaction_id': transaction.id,
         'product_id': item.productId,
@@ -49,16 +45,13 @@ class TransactionService {
         'quantity': item.quantity,
         'discount': item.discount,
         'subtotal': item.subtotal,
-        'pending_sync': 1,
-        'sync_status': 'pending',
       });
 
       // 3. Update stock (reduce from branch_products)
-      await db.rawUpdate('''
-        UPDATE branch_products
-        SET stock = stock - ?, pending_sync = 1, sync_status = 'pending'
-        WHERE branch_id = ? AND product_id = ?
-      ''', [item.quantity, transaction.branchId, item.productId]);
+      await _db.execute(
+        'UPDATE branch_products SET stock = stock - ? WHERE branch_id = ? AND product_id = ?',
+        [item.quantity, transaction.branchId, item.productId],
+      );
     }
 
     return transaction;
@@ -67,19 +60,16 @@ class TransactionService {
   /// Get transactions for a branch.
   Future<List<Transaction>> getTransactions(String branchId,
       {int limit = 50, int offset = 0}) async {
-    final db = await _db.database;
-
-    final transactionMaps = await db.query('transactions',
+    final transactionMaps = await _db.query('transactions',
       where: 'branch_id = ?',
       whereArgs: [branchId],
       orderBy: 'created_at DESC',
       limit: limit,
-      offset: offset,
     );
 
     final transactions = <Transaction>[];
     for (final t in transactionMaps) {
-      final itemMaps = await db.query('transaction_items',
+      final itemMaps = await _db.query('transaction_items',
         where: 'transaction_id = ?',
         whereArgs: [t['id']],
       );

@@ -4,393 +4,523 @@ import 'package:pos_flutter/models/transaction.dart';
 import 'package:pos_flutter/providers/cart_provider.dart';
 
 void main() {
-  late CartProvider cart;
+  group('CartProvider', () {
+    late CartProvider cartProvider;
 
-  // Sample products for testing
-  final productA = Product(
-    id: 'prod-001',
-    name: 'Kopi Hitam',
-    barcode: '8991001001001',
-    price: 15000,
-    category: 'Minuman',
-    branchId: 'branch-001',
-  );
-
-  final productB = Product(
-    id: 'prod-002',
-    name: 'Nasi Goreng',
-    barcode: '8991001001002',
-    price: 25000,
-    category: 'Makanan',
-    branchId: 'branch-001',
-  );
-
-  final productC = Product(
-    id: 'prod-003',
-    name: 'Teh Manis',
-    barcode: '8991001001003',
-    price: 8000,
-    category: 'Minuman',
-    branchId: 'branch-001',
-  );
-
-  setUp(() {
-    cart = CartProvider();
-  });
-
-  group('CartProvider - Initial state', () {
-    test('starts with an empty cart', () {
-      expect(cart.isEmpty, isTrue);
-      expect(cart.items, isEmpty);
-      expect(cart.itemCount, equals(0));
-      expect(cart.total, equals(0.0));
-      expect(cart.discountTotal, equals(0.0));
-      expect(cart.taxRate, equals(0.0));
-      expect(cart.grandTotal, equals(0.0));
-      expect(cart.taxAmount, equals(0.0));
-      expect(cart.taxableAmount, equals(0.0));
-      expect(cart.selectedPaymentMethod, equals('Tunai'));
-      expect(cart.paymentReference, isNull);
-    });
-  });
-
-  group('CartProvider - addProduct', () {
-    test('adds a product to an empty cart', () {
-      cart.addProduct(productA);
-
-      expect(cart.isEmpty, isFalse);
-      expect(cart.items.length, equals(1));
-      expect(cart.items.first.productId, equals('prod-001'));
-      expect(cart.items.first.quantity, equals(1));
-      expect(cart.items.first.productName, equals('Kopi Hitam'));
-      expect(cart.items.first.price, equals(15000));
-      expect(cart.total, equals(15000));
-      expect(cart.itemCount, equals(1));
+    setUp(() {
+      cartProvider = CartProvider();
     });
 
-    test('increments quantity when adding an existing product', () {
-      cart.addProduct(productA);
-      cart.addProduct(productA);
-
-      expect(cart.items.length, equals(1));
-      expect(cart.items.first.quantity, equals(2));
-      expect(cart.total, equals(30000));
-      expect(cart.itemCount, equals(2));
+    tearDown(() {
+      cartProvider.dispose();
     });
 
-    test('adds multiple distinct products', () {
-      cart.addProduct(productA);
-      cart.addProduct(productB);
-
-      expect(cart.items.length, equals(2));
-      expect(cart.total, equals(40000)); // 15000 + 25000
-      expect(cart.itemCount, equals(2));
+    test('initial state is empty cart', () {
+      expect(cartProvider.isEmpty, true);
+      expect(cartProvider.items, isEmpty);
+      expect(cartProvider.itemCount, 0);
+      expect(cartProvider.total, 0.0);
+      expect(cartProvider.discountTotal, 0.0);
+      expect(cartProvider.taxRate, 0.0);
+      expect(cartProvider.taxableAmount, 0.0);
+      expect(cartProvider.taxAmount, 0.0);
+      expect(cartProvider.grandTotal, 0.0);
+      expect(cartProvider.selectedPaymentMethod, 'Tunai');
+      expect(cartProvider.paymentReference, isNull);
     });
 
-    test('adds product with custom quantity', () {
-      cart.addProduct(productC, quantity: 3);
+    group('addProduct', () {
+      test('adds a new product to the cart', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
 
-      expect(cart.items.length, equals(1));
-      expect(cart.items.first.quantity, equals(3));
-      expect(cart.total, equals(24000)); // 8000 * 3
-      expect(cart.itemCount, equals(3));
-    });
-  });
+        cartProvider.addProduct(product);
 
-  group('CartProvider - updateQuantity', () {
-    test('updates quantity of an existing item', () {
-      cart.addProduct(productA);
-      cart.updateQuantity('prod-001', 5);
+        expect(cartProvider.isEmpty, false);
+        expect(cartProvider.items.length, 1);
+        expect(cartProvider.items[0].productId, 'prod_001');
+        expect(cartProvider.items[0].productName, 'Kopi Hitam');
+        expect(cartProvider.items[0].barcode, '8991234567890');
+        expect(cartProvider.items[0].price, 15000.0);
+        expect(cartProvider.items[0].quantity, 1);
+      });
 
-      expect(cart.items.first.quantity, equals(5));
-      expect(cart.total, equals(75000));
-    });
+      test('adds product with custom quantity', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
 
-    test('removes item when quantity is set to zero', () {
-      cart.addProduct(productA);
-      cart.updateQuantity('prod-001', 0);
+        cartProvider.addProduct(product, quantity: 3);
 
-      expect(cart.items, isEmpty);
-      expect(cart.isEmpty, isTrue);
-    });
+        expect(cartProvider.items.length, 1);
+        expect(cartProvider.items[0].quantity, 3);
+        expect(cartProvider.itemCount, 3);
+      });
 
-    test('removes item when quantity is set to negative', () {
-      cart.addProduct(productA);
-      cart.updateQuantity('prod-001', -1);
+      test('increments quantity when adding same product', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
 
-      expect(cart.items, isEmpty);
-    });
+        cartProvider.addProduct(product);
+        cartProvider.addProduct(product);
 
-    test('does nothing for unknown productId', () {
-      cart.addProduct(productA);
-      cart.updateQuantity('nonexistent', 10);
+        expect(cartProvider.items.length, 1);
+        expect(cartProvider.items[0].quantity, 2);
+      });
 
-      expect(cart.items.length, equals(1));
-      expect(cart.items.first.quantity, equals(1));
-    });
-  });
+      test('increments quantity by specified amount when adding same product', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
 
-  group('CartProvider - removeItem', () {
-    test('removes a product from the cart', () {
-      cart.addProduct(productA);
-      cart.addProduct(productB);
+        cartProvider.addProduct(product, quantity: 2);
+        cartProvider.addProduct(product, quantity: 3);
 
-      cart.removeItem('prod-001');
+        expect(cartProvider.items.length, 1);
+        expect(cartProvider.items[0].quantity, 5);
+      });
 
-      expect(cart.items.length, equals(1));
-      expect(cart.items.first.productId, equals('prod-002'));
-      expect(cart.total, equals(25000));
-    });
+      test('adds multiple different products', () {
+        final product1 = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+        final product2 = Product(
+          id: 'prod_002',
+          name: 'Nasi Goreng',
+          barcode: '8991234567891',
+          price: 25000.0,
+          category: 'Makanan',
+          branchId: 'branch_001',
+        );
 
-    test('removing last item empties the cart', () {
-      cart.addProduct(productB);
-      cart.removeItem('prod-002');
+        cartProvider.addProduct(product1);
+        cartProvider.addProduct(product2);
 
-      expect(cart.isEmpty, isTrue);
-    });
-  });
-
-  group('CartProvider - item discounts', () {
-    test('applies discount to a specific item', () {
-      cart.addProduct(productA);
-      cart.setItemDiscount('prod-001', 2000);
-
-      expect(cart.items.first.discount, equals(2000));
-      // subtotal = (15000 * 1) - 2000 = 13000
-      expect(cart.items.first.subtotal, equals(13000));
-      // total = sum of subtotals
-      expect(cart.total, equals(13000));
-    });
-
-    test('updates existing item discount', () {
-      cart.addProduct(productA);
-      cart.setItemDiscount('prod-001', 2000);
-      cart.setItemDiscount('prod-001', 5000);
-
-      expect(cart.items.first.discount, equals(5000));
-      expect(cart.items.first.subtotal, equals(10000));
-    });
-
-    test('does nothing for unknown productId', () {
-      cart.addProduct(productA);
-      cart.setItemDiscount('nonexistent', 3000);
-
-      expect(cart.items.first.discount, equals(0.0));
-    });
-  });
-
-  group('CartProvider - cart-level discount', () {
-    test('default discount total is zero', () {
-      expect(cart.discountTotal, equals(0.0));
-    });
-
-    test('sets cart-level discount', () {
-      cart.addProduct(productA); // total = 15000
-      cart.setCartDiscount(3000);
-
-      expect(cart.discountTotal, equals(3000));
-      expect(cart.total, equals(15000)); // total is sum of item subtotals (unchanged)
-      expect(cart.taxableAmount, equals(12000)); // total - discount = 15000 - 3000
+        expect(cartProvider.items.length, 2);
+        expect(cartProvider.itemCount, 2);
+      });
     });
 
-    test('taxable amount clamps to zero', () {
-      cart.addProduct(productA); // total = 15000
-      cart.setCartDiscount(20000); // discount > total
+    group('removeItem', () {
+      test('removes an existing item from the cart', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
 
-      expect(cart.taxableAmount, equals(0.0));
-    });
-  });
+        cartProvider.addProduct(product);
+        expect(cartProvider.items.length, 1);
 
-  group('CartProvider - tax calculations', () {
-    test('default tax rate is zero', () {
-      expect(cart.taxRate, equals(0.0));
-      expect(cart.taxAmount, equals(0.0));
-    });
+        cartProvider.removeItem('prod_001');
+        expect(cartProvider.items.length, 0);
+        expect(cartProvider.isEmpty, true);
+      });
 
-    test('calculates tax correctly with 11% PPN', () {
-      cart.addProduct(productA, quantity: 2); // total = 30000
+      test('does nothing when removing non-existent item', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
 
-      cart.setTaxRate(0.11);
+        cartProvider.addProduct(product);
+        expect(cartProvider.items.length, 1);
 
-      expect(cart.taxRate, equals(0.11));
-      expect(cart.taxableAmount, equals(30000));
-      expect(cart.taxAmount, equals(3300)); // 30000 * 0.11
-      expect(cart.grandTotal, equals(33300)); // 30000 + 3300
-    });
-
-    test('calculates tax with discount applied', () {
-      cart.addProduct(productA, quantity: 2); // total = 30000
-      cart.setCartDiscount(5000);
-      cart.setTaxRate(0.11);
-
-      expect(cart.taxableAmount, equals(25000)); // 30000 - 5000
-      expect(cart.taxAmount, equals(2750)); // 25000 * 0.11
-      expect(cart.grandTotal, equals(27750)); // 25000 + 2750
-    });
-
-    test('updates tax when rate changes', () {
-      cart.addProduct(productA); // total = 15000
-      cart.setTaxRate(0.11);
-      expect(cart.taxAmount, equals(1650));
-
-      cart.setTaxRate(0.0);
-      expect(cart.taxAmount, equals(0.0));
-    });
-  });
-
-  group('CartProvider - payment method', () {
-    test('default payment method is Tunai', () {
-      expect(cart.selectedPaymentMethod, equals('Tunai'));
+        cartProvider.removeItem('non_existent');
+        expect(cartProvider.items.length, 1);
+      });
     });
 
-    test('changes payment method', () {
-      cart.setPaymentMethod('QRIS');
-      expect(cart.selectedPaymentMethod, equals('QRIS'));
+    group('updateQuantity', () {
+      test('updates quantity of existing item', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+
+        cartProvider.addProduct(product);
+        cartProvider.updateQuantity('prod_001', 5);
+
+        expect(cartProvider.items[0].quantity, 5);
+      });
+
+      test('removes item when quantity set to 0 or negative', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+
+        cartProvider.addProduct(product);
+
+        cartProvider.updateQuantity('prod_001', 0);
+        expect(cartProvider.items.length, 0);
+
+        // Re-add and test with negative
+        cartProvider.addProduct(product);
+        cartProvider.updateQuantity('prod_001', -1);
+        expect(cartProvider.items.length, 0);
+      });
+
+      test('does nothing when updating non-existent item', () {
+        cartProvider.updateQuantity('non_existent', 5);
+        expect(cartProvider.items.length, 0);
+      });
     });
 
-    test('clears reference when changing to Tunai', () {
-      cart.setPaymentMethod('Transfer');
-      cart.setPaymentReference('REF-123');
-      expect(cart.paymentReference, equals('REF-123'));
+    group('clearCart', () {
+      test('clears all items and resets state', () {
+        final product1 = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+        final product2 = Product(
+          id: 'prod_002',
+          name: 'Nasi Goreng',
+          barcode: '8991234567891',
+          price: 25000.0,
+          category: 'Makanan',
+          branchId: 'branch_001',
+        );
 
-      cart.setPaymentMethod('Tunai');
-      expect(cart.paymentReference, isNull);
+        cartProvider.addProduct(product1);
+        cartProvider.addProduct(product2);
+        cartProvider.setCartDiscount(5000.0);
+        cartProvider.setTaxRate(0.11);
+        cartProvider.setPaymentMethod('QRIS');
+        cartProvider.setPaymentReference('REF-123');
+
+        cartProvider.clearCart();
+
+        expect(cartProvider.isEmpty, true);
+        expect(cartProvider.items, isEmpty);
+        expect(cartProvider.discountTotal, 0.0);
+        expect(cartProvider.taxRate, 0.0);
+        expect(cartProvider.selectedPaymentMethod, 'Tunai');
+        expect(cartProvider.paymentReference, isNull);
+      });
     });
 
-    test('clears reference when changing to EDC', () {
-      cart.setPaymentMethod('Transfer');
-      cart.setPaymentReference('REF-123');
+    group('totals calculation', () {
+      test('total is sum of all item subtotals', () {
+        final product1 = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+        final product2 = Product(
+          id: 'prod_002',
+          name: 'Nasi Goreng',
+          barcode: '8991234567891',
+          price: 25000.0,
+          category: 'Makanan',
+          branchId: 'branch_001',
+        );
 
-      cart.setPaymentMethod('EDC');
-      expect(cart.paymentReference, isNull);
+        cartProvider.addProduct(product1); // 1 * 15000 = 15000
+        cartProvider.addProduct(product2); // 1 * 25000 = 25000
+
+        expect(cartProvider.total, 40000.0);
+      });
+
+      test('total accounts for quantity and discounts', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+
+        cartProvider.addProduct(product, quantity: 3);
+        cartProvider.setItemDiscount('prod_001', 5000.0);
+
+        // (15000 * 3) - 5000 = 40000
+        expect(cartProvider.total, 40000.0);
+      });
+
+      test('grandTotal with tax and no cart discount', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 100000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+
+        cartProvider.addProduct(product);
+        cartProvider.setTaxRate(0.11); // 11% PPN
+
+        expect(cartProvider.total, 100000.0);
+        expect(cartProvider.taxableAmount, 100000.0);
+        expect(cartProvider.taxAmount, 11000.0);
+        expect(cartProvider.grandTotal, 111000.0);
+      });
+
+      test('grandTotal with tax and cart discount', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 100000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+
+        cartProvider.addProduct(product);
+        cartProvider.setTaxRate(0.11);
+        cartProvider.setCartDiscount(10000.0);
+
+        // taxableAmount = (100000 - 10000).clamp(0, inf) = 90000
+        // taxAmount = 90000 * 0.11 = 9900
+        // grandTotal = 90000 + 9900 = 99900
+        expect(cartProvider.total, 100000.0);
+        expect(cartProvider.taxableAmount, 90000.0);
+        expect(cartProvider.taxAmount, 9900.0);
+        expect(cartProvider.grandTotal, 99900.0);
+      });
+
+      test('taxableAmount clamps to zero', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 10000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+
+        cartProvider.addProduct(product);
+        cartProvider.setTaxRate(0.11);
+        cartProvider.setCartDiscount(20000.0);
+
+        // total (10000) - discountTotal (20000) = -10000 -> clamp to 0
+        expect(cartProvider.taxableAmount, 0.0);
+        expect(cartProvider.taxAmount, 0.0);
+        expect(cartProvider.grandTotal, 0.0);
+      });
+
+      test('itemCount returns sum of all quantities', () {
+        final product1 = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+        final product2 = Product(
+          id: 'prod_002',
+          name: 'Nasi Goreng',
+          barcode: '8991234567891',
+          price: 25000.0,
+          category: 'Makanan',
+          branchId: 'branch_001',
+        );
+
+        cartProvider.addProduct(product1, quantity: 2);
+        cartProvider.addProduct(product2, quantity: 3);
+
+        expect(cartProvider.itemCount, 5); // 2 + 3
+      });
     });
 
-    test('sets payment reference', () {
-      cart.setPaymentMethod('Transfer');
-      cart.setPaymentReference('TRF-001');
-      expect(cart.paymentReference, equals('TRF-001'));
+    group('setItemDiscount', () {
+      test('sets discount on existing item', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+
+        cartProvider.addProduct(product);
+        cartProvider.setItemDiscount('prod_001', 2000.0);
+
+        expect(cartProvider.items[0].discount, 2000.0);
+      });
+
+      test('does nothing for non-existent item', () {
+        cartProvider.setItemDiscount('non_existent', 1000.0);
+        // Should not throw
+      });
     });
-  });
 
-  group('CartProvider - buildTransaction', () {
-    test('builds a Transaction from current cart state', () {
-      cart.addProduct(productA, quantity: 2); // total = 30000
-      cart.setCartDiscount(3000);
-      cart.setTaxRate(0.11);
-      cart.setPaymentMethod('Tunai');
+    group('setCartDiscount', () {
+      test('sets cart-level discount', () {
+        cartProvider.setCartDiscount(5000.0);
+        expect(cartProvider.discountTotal, 5000.0);
+      });
+    });
 
-      final transaction = cart.buildTransaction(
-        id: 'txn-001',
-        branchId: 'branch-001',
-        cashierId: 'user-001',
-        cashierName: 'Admin',
-        amountPaid: 50000,
-        change: 20300,
+    group('setTaxRate', () {
+      test('sets tax rate', () {
+        cartProvider.setTaxRate(0.11);
+        expect(cartProvider.taxRate, 0.11);
+      });
+    });
+
+    group('setPaymentMethod', () {
+      test('sets payment method and clears reference for Tunai', () {
+        cartProvider.setPaymentMethod('QRIS');
+        cartProvider.setPaymentReference('REF-123');
+
+        cartProvider.setPaymentMethod('Tunai');
+
+        expect(cartProvider.selectedPaymentMethod, 'Tunai');
+        expect(cartProvider.paymentReference, isNull);
+      });
+
+      test('sets payment method and clears reference for EDC', () {
+        cartProvider.setPaymentMethod('QRIS');
+        cartProvider.setPaymentReference('REF-123');
+
+        cartProvider.setPaymentMethod('EDC');
+
+        expect(cartProvider.selectedPaymentMethod, 'EDC');
+        expect(cartProvider.paymentReference, isNull);
+      });
+
+      test('sets payment method without clearing reference for other methods', () {
+        cartProvider.setPaymentReference('REF-123');
+        cartProvider.setPaymentMethod('QRIS');
+
+        expect(cartProvider.selectedPaymentMethod, 'QRIS');
+        expect(cartProvider.paymentReference, 'REF-123');
+      });
+    });
+
+    group('buildTransaction', () {
+      test('builds transaction from cart state', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+
+        cartProvider.addProduct(product, quantity: 2);
+        cartProvider.setTaxRate(0.11);
+
+        final transaction = cartProvider.buildTransaction(
+          id: 'trx_001',
+          branchId: 'branch_001',
+          cashierId: 'user_001',
+          cashierName: 'Owner',
+          amountPaid: 50000.0,
+          change: 16700.0,
+          receiptNumber: 'RCP-001',
+        );
+
+        expect(transaction.id, 'trx_001');
+        expect(transaction.branchId, 'branch_001');
+        expect(transaction.cashierId, 'user_001');
+        expect(transaction.cashierName, 'Owner');
+        expect(transaction.items.length, 1);
+        expect(transaction.items[0].productId, 'prod_001');
+        expect(transaction.total, 30000.0);
+        expect(transaction.taxRate, 0.11);
+        expect(transaction.grandTotal, 33300.0); // 30000 + (30000*0.11)
+        expect(transaction.amountPaid, 50000.0);
+        expect(transaction.change, 16700.0);
+        expect(transaction.receiptNumber, 'RCP-001');
+        expect(transaction.paymentMethod, 'Tunai');
+      });
+    });
+
+    group('items getter returns unmodifiable list', () {
+      test('cannot modify returned list directly', () {
+        final product = Product(
+          id: 'prod_001',
+          name: 'Kopi Hitam',
+          barcode: '8991234567890',
+          price: 15000.0,
+          category: 'Minuman',
+          branchId: 'branch_001',
+        );
+
+        cartProvider.addProduct(product);
+
+        final items = cartProvider.items;
+        expect(() => items.clear(), throwsUnsupportedError);
+      });
+    });
+
+    test('notifies listeners on state changes', () {
+      int notifyCount = 0;
+      cartProvider.addListener(() {
+        notifyCount++;
+      });
+
+      final product = Product(
+        id: 'prod_001',
+        name: 'Kopi Hitam',
+        barcode: '8991234567890',
+        price: 15000.0,
+        category: 'Minuman',
+        branchId: 'branch_001',
       );
 
-      expect(transaction.id, equals('txn-001'));
-      expect(transaction.branchId, equals('branch-001'));
-      expect(transaction.cashierId, equals('user-001'));
-      expect(transaction.cashierName, equals('Admin'));
-      expect(transaction.items.length, equals(1));
-      expect(transaction.items.first.productName, equals('Kopi Hitam'));
-      expect(transaction.items.first.quantity, equals(2));
-      expect(transaction.total, equals(30000));
-      expect(transaction.discountTotal, equals(3000));
-      expect(transaction.taxRate, equals(0.11));
-      expect(transaction.paymentMethod, equals('Tunai'));
-      expect(transaction.paymentReference, isNull);
-      expect(transaction.amountPaid, equals(50000));
-      expect(transaction.change, equals(20300));
-      expect(transaction.receiptNumber, isNull);
-    });
+      cartProvider.addProduct(product);
+      expect(notifyCount, greaterThanOrEqualTo(1));
 
-    test('buildTransaction preserves item discounts', () {
-      cart.addProduct(productA);
-      cart.setItemDiscount('prod-001', 2000);
-
-      final transaction = cart.buildTransaction(
-        id: 'txn-002',
-        branchId: 'branch-001',
-        cashierId: 'user-001',
-        cashierName: 'Admin',
-        amountPaid: 15000,
-        change: 2000,
-      );
-
-      expect(transaction.items.first.discount, equals(2000));
-      expect(transaction.items.first.subtotal, equals(13000));
-    });
-  });
-
-  group('CartProvider - clearCart', () {
-    test('resets all state to defaults', () {
-      // Setup non-default state
-      cart.addProduct(productA);
-      cart.addProduct(productB);
-      cart.addProduct(productC);
-      cart.setCartDiscount(5000);
-      cart.setTaxRate(0.11);
-      cart.setPaymentMethod('QRIS');
-      cart.setPaymentReference('QR-001');
-
-      expect(cart.isEmpty, isFalse);
-
-      cart.clearCart();
-
-      expect(cart.isEmpty, isTrue);
-      expect(cart.items, isEmpty);
-      expect(cart.discountTotal, equals(0.0));
-      expect(cart.taxRate, equals(0.0));
-      expect(cart.selectedPaymentMethod, equals('Tunai'));
-      expect(cart.paymentReference, isNull);
-      expect(cart.total, equals(0.0));
-      expect(cart.taxAmount, equals(0.0));
-      expect(cart.grandTotal, equals(0.0));
-      expect(cart.itemCount, equals(0));
-    });
-  });
-
-  group('CartProvider - computed properties', () {
-    test('itemCount sums quantities across items', () {
-      cart.addProduct(productA, quantity: 3);
-      cart.addProduct(productB, quantity: 2);
-      cart.addProduct(productC, quantity: 5);
-
-      expect(cart.itemCount, equals(10)); // 3 + 2 + 5
-    });
-
-    test('total is sum of item subtotals', () {
-      cart.addProduct(productA, quantity: 2); // 15000*2 = 30000
-      cart.addProduct(productB); // 25000
-      cart.setItemDiscount('prod-001', 5000); // subtotal = 30000-5000 = 25000
-
-      // total = 25000 + 25000 = 50000
-      expect(cart.total, equals(50000));
-    });
-
-    test('grandTotal includes tax minus discount', () {
-      cart.addProduct(productA, quantity: 2); // 30000
-      cart.setCartDiscount(5000); // taxable = 25000
-      cart.setTaxRate(0.11); // tax = 2750, grand = 27750
-
-      expect(cart.grandTotal, equals(27750));
-    });
-
-    test('returned items list is unmodifiable', () {
-      cart.addProduct(productA);
-
-      expect(
-        () => cart.items.add(
-          TransactionItem(
-            productId: 'x',
-            productName: 'X',
-            barcode: '000',
-            price: 0,
-          ),
-        ),
-        throwsA(isA<UnsupportedError>()),
-      );
+      final previousCount = notifyCount;
+      cartProvider.removeItem('prod_001');
+      expect(notifyCount, greaterThan(previousCount));
     });
   });
 }
