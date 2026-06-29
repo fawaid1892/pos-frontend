@@ -18,7 +18,7 @@ class ApiConfig {
   /// ── ElectricSQL Sync Endpoints ──
 
   /// Electric sync service base URL (runs on Docker, port 5133).
-  static const String electricBaseUrl = 'http://localhost:5133';
+  static const String electricBaseUrl = 'https://api.electric-sql.cloud';
 
   /// Shape URL for a given table name.
   static String shapeUrl(String table) => '$electricBaseUrl/v1/shape/$table';

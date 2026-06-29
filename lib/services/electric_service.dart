@@ -22,7 +22,7 @@ class ElectricService extends ChangeNotifier {
   factory ElectricService() => _instance;
   ElectricService._internal();
 
-  static const String _baseUrl = 'http://localhost:5133';
+  static const String _baseUrl = 'https://api.electric-sql.cloud';
 
   http.Client _httpClient = http.Client();
 
